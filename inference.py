@@ -6,7 +6,7 @@ from pathlib import Path
 
 from transformers import AutoTokenizer, AutoFeatureExtractor, AutoModelForSpeechSeq2Seq
 from pipeline import DiCoWPipeline
-from diarizen.pipelines.inference import DiariZenPipeline
+from DiariZen.diarizen.pipelines.inference import DiariZenPipeline
 
 def create_lower_uppercase_mapping(tokenizer):
     tokenizer.upper_cased_tokens = {}
