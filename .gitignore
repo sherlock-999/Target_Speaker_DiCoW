@@ -157,3 +157,6 @@ dmypy.json
 # Input & Output Folders
 input/
 output/
+
+# Model Weights
+*.safetensors
