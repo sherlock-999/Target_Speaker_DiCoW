@@ -152,7 +152,7 @@ dmypy.json
 
 
 # Audio Files
-.wav
+*.wav
 
 # Input & Output Folders
 input/
