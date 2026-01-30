@@ -8,13 +8,16 @@ from pathlib import Path
 # --------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT / "model"))
+sys.path.insert(0, str(PROJECT_ROOT / "DiariZen"))
+MODELS_DIR = PROJECT_ROOT / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 from transformers import AutoTokenizer, AutoFeatureExtractor
 
 from DiCoW.modeling_dicow import DiCoWForConditionalGeneration
 
 from pipeline import DiCoWPipeline
-from DiariZen.diarizen.pipelines.inference import DiariZenPipeline
+from diarizen.pipelines.inference import DiariZenPipeline
 
 
 # -----------------------------
@@ -23,7 +26,7 @@ from DiariZen.diarizen.pipelines.inference import DiariZenPipeline
 INPUT_DIR = "input"
 OUTPUT_DIR = "output"
 DIAR_MODEL_PATH = "BUT-FIT/diarizen-wavlm-large-s80-md"
-DICOW_MODEL_PATH = Path("model/DiCoW").resolve()
+DICOW_MODEL_PATH = (MODELS_DIR / "DiCoW").resolve()
 sys.path.insert(0, str(DICOW_MODEL_PATH))
 
 
@@ -84,7 +87,10 @@ def main():
     # --------------------------------------------------
     # Load DiariZen
     # --------------------------------------------------
-    diar_pipeline = DiariZenPipeline.from_pretrained(DIAR_MODEL_PATH).to(device)
+    diar_pipeline = DiariZenPipeline.from_pretrained(
+        DIAR_MODEL_PATH,
+        cache_dir=str(MODELS_DIR)
+    ).to(device)
     diar_pipeline.embedding_batch_size = 16
     diar_pipeline.segmentation_batch_size = 16
 

@@ -1,9 +1,15 @@
 import gradio as gr
 import torch
-from diarizen.pipelines.inference import DiariZenPipeline
+import sys
+from pathlib import Path
 from transformers import AutoTokenizer, AutoFeatureExtractor, AutoModelForSpeechSeq2Seq
 
 from pipeline import DiCoWPipeline
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT / "DiariZen"))
+
+from diarizen.pipelines.inference import DiariZenPipeline
 
 
 def create_lower_uppercase_mapping(tokenizer):
@@ -25,15 +31,30 @@ def create_lower_uppercase_mapping(tokenizer):
 
 
 device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+MODELS_DIR = Path(__file__).resolve().parent / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 MODEL_NAME = "BUT-FIT/DiCoW_v3_2"
 DIARIZATION_MODEL = "BUT-FIT/diarizen-wavlm-large-s80-md"
-dicow = AutoModelForSpeechSeq2Seq.from_pretrained(MODEL_NAME, trust_remote_code=True)
-feature_extractor = AutoFeatureExtractor.from_pretrained(MODEL_NAME)
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+dicow = AutoModelForSpeechSeq2Seq.from_pretrained(
+    MODEL_NAME,
+    trust_remote_code=True,
+    cache_dir=str(MODELS_DIR)
+)
+feature_extractor = AutoFeatureExtractor.from_pretrained(
+    MODEL_NAME,
+    cache_dir=str(MODELS_DIR)
+)
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_NAME,
+    cache_dir=str(MODELS_DIR)
+)
 create_lower_uppercase_mapping(tokenizer)
 dicow.set_tokenizer(tokenizer)
-diar_pipeline = DiariZenPipeline.from_pretrained(DIARIZATION_MODEL).to(device)
+diar_pipeline = DiariZenPipeline.from_pretrained(
+    DIARIZATION_MODEL,
+    cache_dir=str(MODELS_DIR)
+).to(device)
 diar_pipeline.embedding_batch_size = 16
 diar_pipeline.segmentation_batch_size = 16
 

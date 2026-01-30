@@ -2,11 +2,18 @@ import torch
 import argparse
 import os
 import glob
+import sys
 from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT / "DiariZen"))
 
 from transformers import AutoTokenizer, AutoFeatureExtractor, AutoModelForSpeechSeq2Seq
 from pipeline import DiCoWPipeline
-from DiariZen.diarizen.pipelines.inference import DiariZenPipeline
+from diarizen.pipelines.inference import DiariZenPipeline
+
+MODELS_DIR = Path(__file__).resolve().parent / "models"
+MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 def create_lower_uppercase_mapping(tokenizer):
     tokenizer.upper_cased_tokens = {}
@@ -180,16 +187,29 @@ def main():
     if args.verbose:
         print("Loading DiCoW model...")
 
-    dicow = AutoModelForSpeechSeq2Seq.from_pretrained(args.dicow_model, trust_remote_code=True)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(args.dicow_model)
-    tokenizer = AutoTokenizer.from_pretrained(args.dicow_model)
+    dicow = AutoModelForSpeechSeq2Seq.from_pretrained(
+        args.dicow_model,
+        trust_remote_code=True,
+        cache_dir=str(MODELS_DIR)
+    )
+    feature_extractor = AutoFeatureExtractor.from_pretrained(
+        args.dicow_model,
+        cache_dir=str(MODELS_DIR)
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        args.dicow_model,
+        cache_dir=str(MODELS_DIR)
+    )
     create_lower_uppercase_mapping(tokenizer)
     dicow.set_tokenizer(tokenizer)
 
     if args.verbose:
         print("Loading diarization model...")
 
-    diar_pipeline = DiariZenPipeline.from_pretrained(args.diarization_model).to(device)
+    diar_pipeline = DiariZenPipeline.from_pretrained(
+        args.diarization_model,
+        cache_dir=str(MODELS_DIR)
+    ).to(device)
     diar_pipeline.embedding_batch_size = args.embedding_batch_size
     diar_pipeline.segmentation_batch_size = args.segmentation_batch_size
 
