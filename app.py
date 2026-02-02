@@ -62,13 +62,16 @@ pipeline = DiCoWPipeline(dicow, diarization_pipeline=diar_pipeline, feature_extr
                          tokenizer=tokenizer, device=device)
 
 
-def transcribe(inputs):
+def transcribe(inputs, reference_audio=None):
     if inputs is None:
         raise gr.Error(
             "No audio file submitted! Please upload or record an audio file before submitting your request. "
             "Note: You might have pressed the 'Submit' button before the audio was displayed.")
 
-    text = pipeline(inputs, return_timestamps=True)["text"]
+    if reference_audio:
+        text = pipeline({"audio": inputs, "reference_audio": reference_audio}, return_timestamps=True)["text"]
+    else:
+        text = pipeline(inputs, return_timestamps=True)["text"]
     torch.cuda.empty_cache()
     return text
 
@@ -76,11 +79,11 @@ def transcribe(inputs):
 demo = gr.Blocks(theme=gr.themes.Ocean())
 
 mf_audio = gr.Audio(sources="microphone", type="filepath", format="wav")
+mf_ref_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Reference speaker audio (optional)")
 
 mf_transcribe = gr.Interface(
     fn=transcribe,
-    inputs=[mf_audio
-            ],
+    inputs=[mf_audio, mf_ref_audio],
     outputs="text",
     title="DiCoW: Diarization-Conditioned Whisper",
     description=(
@@ -96,6 +99,7 @@ file_transcribe = gr.Interface(
     fn=transcribe,
     inputs=[
         gr.Audio(sources="upload", type="filepath", label="Audio file"),
+        gr.Audio(sources=["microphone", "upload"], type="filepath", label="Reference speaker audio (optional)"),
     ],
     outputs="text",
     title="DiCoW: Diarization-Conditioned Whisper",
@@ -168,4 +172,5 @@ with demo:
     )
     mf_audio.start_recording(lambda _: gr.Warning(f"Please wait for the audio to be displayed before submitting!"))
 
-demo.queue(max_size=5).launch(share=False, root_path="/gradio-demo")
+# demo.queue(max_size=5).launch(share=False, root_path="/gradio-demo")
+demo.queue(max_size=5).launch(share=True, root_path="/gradio-demo")

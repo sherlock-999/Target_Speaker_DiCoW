@@ -54,6 +54,13 @@ def parse_arguments():
         help="Diarization model name or path"
     )
 
+    parser.add_argument(
+        "--reference-audio",
+        type=str,
+        default=None,
+        help="Path to reference audio of target speaker (optional)"
+    )
+
     # Input/Output arguments
     parser.add_argument(
         "--input-folder",
@@ -128,14 +135,17 @@ def find_wav_files(input_folder, file_pattern):
     return sorted(wav_files)
 
 
-def process_audio_file(pipeline, audio_path, output_folder, verbose=False):
+def process_audio_file(pipeline, audio_path, output_folder, reference_audio=None, verbose=False):
     """Process a single audio file and save the results as txt."""
     if verbose:
         print(f"Processing: {audio_path}")
 
     try:
         # Process the audio file
-        result = pipeline(audio_path, return_timestamps=True)
+        if reference_audio:
+            result = pipeline({"audio": audio_path, "reference_audio": reference_audio}, return_timestamps=True)
+        else:
+            result = pipeline(audio_path, return_timestamps=True)
 
         # Prepare output filename
         audio_filename = Path(audio_path).stem
@@ -165,6 +175,9 @@ def main():
     # Validate input folder
     if not os.path.exists(args.input_folder):
         print(f"Error: Input folder '{args.input_folder}' does not exist.")
+        return
+    if args.reference_audio and not os.path.exists(args.reference_audio):
+        print(f"Error: Reference audio '{args.reference_audio}' does not exist.")
         return
 
     # Create output folder if it doesn't exist
@@ -232,6 +245,7 @@ def main():
             pipeline,
             audio_file,
             args.output_folder,
+            args.reference_audio,
             args.verbose
         )
         if result:

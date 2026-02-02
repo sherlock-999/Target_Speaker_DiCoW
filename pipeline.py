@@ -3,6 +3,7 @@ import re
 from typing import Dict, Optional
 
 import gradio as gr
+import numpy as np
 import torch
 from librosa import load as libr_load
 from soundfile import write as sf_write
@@ -42,6 +43,85 @@ class DiCoWPipeline(AutomaticSpeechRecognitionPipeline):
         super().__init__(*args, **kwargs)
         self.diarization_pipeline = diarization_pipeline
         self.type = "seq2seq_whisper"
+
+    @staticmethod
+    def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+        denom = (np.linalg.norm(a) * np.linalg.norm(b)) + 1e-8
+        if denom == 0:
+            return float("nan")
+        return float(np.dot(a, b) / denom)
+
+    def _get_embedding_tools(self):
+        embedder = getattr(self.diarization_pipeline, "_embedding", None)
+        audio = getattr(self.diarization_pipeline, "_audio", None)
+        if embedder is None or audio is None:
+            raise RuntimeError("Diarization pipeline does not expose embedding tools.")
+        return embedder, audio
+
+    def _compute_embedding_for_file(self, audio_path: str):
+        embedder, audio = self._get_embedding_tools()
+        waveform, _ = audio({"audio": audio_path})
+        waveform = waveform.unsqueeze(0)
+        embedding = np.asarray(embedder(waveform))
+        if np.isnan(embedding).any():
+            return None
+        return embedding[0]
+
+    def _compute_embedding_for_timeline(self, audio_path: str, timeline):
+        embedder, audio = self._get_embedding_tools()
+        min_samples = getattr(embedder, "min_num_samples", None)
+        min_duration = 0.0
+        if min_samples is not None:
+            min_duration = float(min_samples) / float(embedder.sample_rate)
+
+        embeddings = []
+        weights = []
+        for segment in timeline:
+            duration = segment.end - segment.start
+            if duration <= 0 or duration < min_duration:
+                continue
+            try:
+                waveform, _ = audio.crop(audio_path, segment, mode="pad")
+            except Exception:
+                continue
+            waveform = waveform.unsqueeze(0)
+            embedding = np.asarray(embedder(waveform))
+            if np.isnan(embedding).any():
+                continue
+            embeddings.append(embedding[0])
+            weights.append(duration)
+
+        if not embeddings:
+            return None
+
+        embeddings = np.vstack(embeddings)
+        weights = np.asarray(weights, dtype=np.float32)
+        return np.average(embeddings, axis=0, weights=weights)
+
+    def _select_target_speaker_index(self, audio_path: str, diarization_output, reference_audio: str):
+        reference_embedding = self._compute_embedding_for_file(reference_audio)
+        if reference_embedding is None:
+            return None
+
+        speaker_labels = list(diarization_output.labels())
+        if not speaker_labels:
+            return None
+
+        best_index = None
+        best_score = -float("inf")
+        for idx, speaker in enumerate(speaker_labels):
+            timeline = diarization_output.label_timeline(speaker)
+            speaker_embedding = self._compute_embedding_for_timeline(audio_path, timeline)
+            if speaker_embedding is None:
+                continue
+            score = self._cosine_similarity(reference_embedding, speaker_embedding)
+            if np.isnan(score):
+                continue
+            if score > best_score:
+                best_score = score
+                best_index = idx
+
+        return best_index
 
     def get_diarization_mask(self, per_speaker_samples, audio_length):
         diarization_mask = torch.zeros(len(per_speaker_samples), audio_length)
@@ -94,32 +174,59 @@ class DiCoWPipeline(AutomaticSpeechRecognitionPipeline):
 
         return enrollment_features, enrollment_attention, enrollment_stno
 
-    def preprocess(self, inputs, chunk_length_s=0, stride_length_s=None):
-        if not isinstance(inputs, str):
-            raise ValueError("For now input must be a string representing a path to an audio file")
+    def preprocess(self, inputs, chunk_length_s=0, stride_length_s=None, reference_audio=None, target_speaker_audio=None):
+        audio_path = inputs
+        ref_audio = reference_audio or target_speaker_audio
+        if isinstance(inputs, dict):
+            audio_path = inputs.get("audio", None)
+            ref_audio = ref_audio or inputs.get("reference_audio") or inputs.get("reference") or inputs.get(
+                "target_speaker_audio")
+        elif isinstance(inputs, (list, tuple)) and len(inputs) == 2:
+            audio_path, ref_audio = inputs
 
-        input_dirname = os.path.dirname(inputs)
+        if not isinstance(audio_path, str):
+            raise ValueError("Input must be a string path to an audio file.")
+
+        input_dirname = os.path.dirname(audio_path)
         resampled_path = f'{input_dirname}/resampled.wav'
 
-        inp_aud, sr = libr_load(inputs, sr=16_000, mono=True)
+        inp_aud, sr = libr_load(audio_path, sr=16_000, mono=True)
         sf_write(resampled_path, inp_aud, sr, format='wav')
-        inputs = resampled_path
+        audio_path = resampled_path
 
-        generator = super().preprocess(inputs, chunk_length_s=chunk_length_s, stride_length_s=stride_length_s)
+        generator = super().preprocess(audio_path, chunk_length_s=chunk_length_s, stride_length_s=stride_length_s)
         samples = next(generator)
 
-        diariation_output = self.diarization_pipeline(inputs)
+        diariation_output = self.diarization_pipeline(audio_path)
         per_speaker_samples = []
         for speaker in diariation_output.labels():
             per_speaker_samples.append(diariation_output.label_timeline(speaker))
+
+        target_speaker_index = None
+        if ref_audio:
+            try:
+                target_speaker_index = self._select_target_speaker_index(audio_path, diariation_output, ref_audio)
+                if target_speaker_index is None:
+                    gr.Warning("Reference audio could not be matched to a diarized speaker. Falling back to all speakers.")
+            except Exception:
+                gr.Warning("Target speaker selection failed. Falling back to all speakers.")
+
         diarization_mask = self.get_diarization_mask(per_speaker_samples, samples['input_features'].shape[-1] // 2)
         stno_masks = []
         for i, speaker_samples in enumerate(per_speaker_samples):
             stno_mask = self.get_stno_mask(diarization_mask, i)
             stno_masks.append(stno_mask)
-        samples['stno_mask'] = torch.stack(stno_masks, axis=0).to(samples['input_features'].device,
-                                                                  dtype=samples['input_features'].dtype)
-        samples['input_features'] = samples['input_features'].repeat(len(per_speaker_samples), 1, 1)
+
+        if target_speaker_index is not None:
+            stno_masks = [stno_masks[target_speaker_index]]
+            num_speakers = 1
+        else:
+            num_speakers = len(per_speaker_samples)
+
+        samples['stno_mask'] = torch.stack(stno_masks, axis=0).to(
+            samples['input_features'].device, dtype=samples['input_features'].dtype
+        )
+        samples['input_features'] = samples['input_features'].repeat(num_speakers, 1, 1)
         samples['attention_mask'] = torch.ones(samples['input_features'].shape[0], samples['input_features'].shape[2],
                                                dtype=torch.bool, device=samples['input_features'].device)
         if "num_frames" in samples:
