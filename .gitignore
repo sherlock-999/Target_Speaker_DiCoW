@@ -160,3 +160,19 @@ output/
 
 # Model Weights
 *.safetensors
+
+# Nvidia Nemo
+*.nemo
+
+# logs
+Sortformer/logs/
+Sortformer/pred_tensors/
+
+# pt files
+Sortformer/diarisation_masks
+
+# Manifest json files
+Sortformer/*.json
+
+# Transcription Results
+Sortformer/output_transcriptions
