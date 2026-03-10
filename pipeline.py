@@ -1,12 +1,10 @@
-import os
 import re
-from typing import Dict, Optional
+from typing import Dict
 
 import gradio as gr
 import numpy as np
 import torch
 from librosa import load as libr_load
-from soundfile import write as sf_write
 from transformers.pipelines.automatic_speech_recognition import AutomaticSpeechRecognitionPipeline
 
 
@@ -52,6 +50,8 @@ class DiCoWPipeline(AutomaticSpeechRecognitionPipeline):
         return float(np.dot(a, b) / denom)
 
     def _get_embedding_tools(self):
+        if self.diarization_pipeline is None:
+            raise RuntimeError("Diarization pipeline is not available for embedding extraction.")
         embedder = getattr(self.diarization_pipeline, "_embedding", None)
         audio = getattr(self.diarization_pipeline, "_audio", None)
         if embedder is None or audio is None:
@@ -187,14 +187,9 @@ class DiCoWPipeline(AutomaticSpeechRecognitionPipeline):
         if not isinstance(audio_path, str):
             raise ValueError("Input must be a string path to an audio file.")
 
-        input_dirname = os.path.dirname(audio_path)
-        resampled_path = f'{input_dirname}/resampled.wav'
-
         inp_aud, sr = libr_load(audio_path, sr=16_000, mono=True)
-        sf_write(resampled_path, inp_aud, sr, format='wav')
-        audio_path = resampled_path
 
-        generator = super().preprocess(audio_path, chunk_length_s=chunk_length_s, stride_length_s=stride_length_s)
+        generator = super().preprocess(inp_aud, chunk_length_s=chunk_length_s, stride_length_s=stride_length_s)
         samples = next(generator)
 
         diariation_output = self.diarization_pipeline(audio_path)
