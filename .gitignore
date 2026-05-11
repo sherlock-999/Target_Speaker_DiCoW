@@ -164,3 +164,23 @@ output/
 # Model cache (keep README)
 models/*
 !models/README.md
+.codex
+files/*
+.gradio/
+slurm/
+
+# Local evaluation and scoring utilities
+tmp_solospeech_meeteval.py
+score_testset_tse_from_existing_dicow*.py
+score_l2m_*.py
+run_vibevoice*.py
+rescore_nsf_l2m.py
+evaluate_*_offline.py
+evaluate_*_online.py
+clean_vibevoice_notsofar*.py
+compare_run_summaries.py
+compare_l2m_*.py
+compute_libri2mix_*.py
+generate_final_results.py
+merge_dicow*.py
+metrics_*.md
