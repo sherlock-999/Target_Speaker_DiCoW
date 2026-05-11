@@ -170,6 +170,7 @@ files/*
 slurm/
 
 # Local evaluation and scoring utilities
+local_evaluation/
 tmp_solospeech_meeteval.py
 score_testset_tse_from_existing_dicow*.py
 score_l2m_*.py
@@ -183,4 +184,4 @@ compare_l2m_*.py
 compute_libri2mix_*.py
 generate_final_results.py
 merge_dicow*.py
-metrics_*.md
+metrics*.md
