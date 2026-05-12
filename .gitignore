@@ -171,6 +171,7 @@ slurm/
 
 # Local evaluation and scoring utilities
 local_evaluation/
+local_text_norm/
 tmp_solospeech_meeteval.py
 score_testset_tse_from_existing_dicow*.py
 score_l2m_*.py
