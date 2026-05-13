@@ -18,50 +18,95 @@ Training and inference source codes can be found here: [TS-ASR-Whisper](https://
 
 ## Demo
 
-![DiCoW-v1 Demo](img.png)  
-
-### Online Usage
-Run the app directly in your browser with [Gradio app](https://pccnect.fit.vutbr.cz/gradio-demo).
+![DiCoW-v1 Demo](img.png)
 
 ## Installation
 
 ### Requirements
 
-Before running the app, ensure you have the following installed:
-
-- **Python 3.11**  
+- **Conda** (Miniconda or Anaconda)
+- **Python 3.11**
 - **FFmpeg**: Required for audio processing.
-- Python Libraries:  
-  - `gradio`  
-  - `transformers`  
-  - `pyannote.audio`  
-  - `torch`
-  - `librosa`
-  - `soundfile`
+- **NVIDIA GPU with CUDA 12.1+**: Recommended for inference (CPU fallback supported).
 
-### Setup
+### Setup (Verified)
 
-1. Clone the repository:  
-    ```bash 
-   git clone https://github.com/BUTSpeechFIT/DiCoW.git
-   cd DiCoW  
-    ```
-2. Setup dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Clone DiariZen submodule:
-   ```bash
-   git submodule init
-   git submodule update
-   ```
-4. Install the DiariZen dependencies:
-   ```bash
-   cd DiariZen
-   cd pyannote-audio
-   pip install -e .
-   cd .. & cd ..
-   ```
+> **Note:** DiariZen is vendored (included directly in this repo). No git submodule commands needed.
+
+#### 1. Create conda environment
+
+```bash
+conda create -n dicow python=3.11 -y
+conda activate dicow
+```
+
+#### 2. Install PyTorch with CUDA support
+
+```bash
+pip install torch==2.5.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+```
+
+#### 3. Install core Python dependencies
+
+```bash
+pip install transformers==4.42.0
+pip install pyannote.core==5.0.0 pyannote.database==5.1.3 pyannote.metrics==3.2.1 pyannote.pipeline==3.0.1
+pip install librosa soundfile fastapi uvicorn gradio==3.50.2
+pip install accelerate onnxruntime toml silero-vad coloredlogs
+```
+
+> **Note:** `requirements.txt` contains a full `pip freeze` snapshot with many development tools (jupyter, pytest, etc.). The commands above install the minimal set needed for inference.
+
+#### 4. Clone the repository
+
+```bash
+git clone https://github.com/sherlock-999/Target_Speaker_DiCoW.git
+cd Target_Speaker_DiCoW
+git checkout enroll_DiCoW_adnan
+```
+
+#### 5. Install pyannote.audio from vendored DiariZen
+
+```bash
+pip install "setuptools<70" flit_core
+cd DiariZen/pyannote-audio
+pip install --no-build-isolation -e .
+cd ../..
+```
+
+#### 6. Install DiariZen
+
+```bash
+cd DiariZen
+pip install --no-build-isolation -e .
+cd ..
+```
+
+#### 7. Verify the installation
+
+```bash
+python -c "
+import sys; sys.path.insert(0, 'DiariZen')
+from pipeline import DiCoWPipeline
+from diarizen.pipelines.inference import DiariZenPipeline
+print('All imports OK — installation successful!')
+"
+```
+
+#### 8. (Optional) Pre-download models for offline use
+
+```bash
+python - <<'PY'
+from pathlib import Path
+from huggingface_hub import snapshot_download
+
+models_dir = Path.cwd() / "models"
+models_dir.mkdir(parents=True, exist_ok=True)
+
+snapshot_download(repo_id="BUT-FIT/DiCoW_v3_2", cache_dir=models_dir)
+snapshot_download(repo_id="BUT-FIT/diarizen-wavlm-large-s80-md", cache_dir=models_dir)
+PY
+```
    
 ## Usage
 
