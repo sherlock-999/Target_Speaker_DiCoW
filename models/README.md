@@ -1,38 +1,32 @@
-# Models Directory
+# Model Cache
 
-This folder is the dedicated cache location for all DiCoW and DiariZen models
-used by the pipeline. Keep model downloads here so runs are reproducible and
-do not depend on the global Hugging Face cache.
+This directory is the HuggingFace cache for all models used by the pipeline.
+Models are auto-downloaded on first run — you only need to pre-populate this
+folder if you plan to run strictly offline.
 
-## Populate this folder (required before offline use)
-
-Run these commands from the repository root:
+## Pre-download all models (optional)
 
 ```bash
 python - <<'PY'
 from pathlib import Path
-from huggingface_hub import snapshot_download, hf_hub_download
+from huggingface_hub import snapshot_download
 
-models_dir = Path.cwd() / "models"
-models_dir.mkdir(parents=True, exist_ok=True)
+cache = Path.cwd() / "models"
+cache.mkdir(parents=True, exist_ok=True)
 
-# DiCoW model
-snapshot_download(repo_id="BUT-FIT/DiCoW_v3_2", cache_dir=models_dir)
-
-# DiariZen diarization model
-snapshot_download(repo_id="BUT-FIT/diarizen-wavlm-large-s80-md", cache_dir=models_dir)
-
-# DiariZen embedding model dependency
-hf_hub_download(
-    repo_id="pyannote/wespeaker-voxceleb-resnet34-LM",
-    filename="pytorch_model.bin",
-    cache_dir=models_dir
-)
+for repo in (
+    "BUT-FIT/DiCoW_v3_2",
+    "BUT-FIT/diarizen-wavlm-large-s80-md",
+    "Adnan256/streaming-target-stno-wavlm-base",
+    "pyannote/wespeaker-voxceleb-resnet34-LM",
+):
+    snapshot_download(repo_id=repo, cache_dir=cache)
+    print(f"OK: {repo}")
 PY
 ```
 
-Notes:
-- The pipeline scripts (`inference.py`, `app.py`, `local_run.py`) are configured
-  to use this folder as the cache directory.
-- If you want strict offline mode, run the above once, then keep this directory
-  intact for future runs.
+## When you need this
+
+- **Online / normal use** — skip this. HF Hub downloads models on first run.
+- **Offline / air-gapped machines** — run the script once on a connected machine,
+  then copy the `models/` directory to the target server.
