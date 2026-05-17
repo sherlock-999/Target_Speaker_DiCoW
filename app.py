@@ -20,8 +20,6 @@ from diarizen.pipelines.inference import DiariZenPipeline
 
 MODEL_NAME = "BUT-FIT/DiCoW_v3_2"
 DIARIZATION_MODEL = "BUT-FIT/diarizen-wavlm-large-s80-md"
-STNO_CONFIG = PROJECT_ROOT / "DiariZen" / "stno_model" / "config.toml"
-STNO_CHECKPOINT = PROJECT_ROOT / "DiariZen" / "stno_model" / "pytorch_model.bin"
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -86,8 +84,6 @@ online_chunked_pipeline = OnlineTargetDiCoW(
 online_target_pipeline = RollingOnlineTargetDiCoW(
     pipeline,
     dicow_model_name=MODEL_NAME,
-    stno_config=STNO_CONFIG,
-    stno_checkpoint=STNO_CHECKPOINT,
     chunk_s=6.0,
     lookback_s=20.0,
     decode_window_s=30.0,

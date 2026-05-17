@@ -226,8 +226,9 @@ class RollingOnlineTargetDiCoW:
         pipeline,
         *,
         dicow_model_name: str,
-        stno_config: Path,
-        stno_checkpoint: Path,
+        stno_config: Path | None = None,
+        stno_checkpoint: Path | None = None,
+        stno_model_id: str = "Adnan256/streaming-target-stno-wavlm-base",
         chunk_s: float = 15.0,
         lookback_s: float = 20.0,
         decode_window_s: float = 30.0,
@@ -241,11 +242,17 @@ class RollingOnlineTargetDiCoW:
         self.decode_window_s = decode_window_s
         self.commit_min_match_words = commit_min_match_words
         self.commit_max_current_match_start = commit_max_current_match_start
-        self.stno_pipeline = TargetConditionedSTNOPipeline.from_experiment(
-            config_path=stno_config,
-            checkpoint_path=stno_checkpoint,
-            device=self.device,
-        )
+        if stno_config is not None and stno_checkpoint is not None:
+            self.stno_pipeline = TargetConditionedSTNOPipeline.from_experiment(
+                config_path=stno_config,
+                checkpoint_path=stno_checkpoint,
+                device=self.device,
+            )
+        else:
+            self.stno_pipeline = TargetConditionedSTNOPipeline.from_pretrained(
+                stno_model_id,
+                device=self.device,
+            )
         self.model, self.feature_extractor, self.tokenizer = load_dicow(
             dicow_model_name,
             device=self.device,
