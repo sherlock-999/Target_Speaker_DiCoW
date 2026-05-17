@@ -1,0 +1,30 @@
+[model]
+path = "diarizen.models.eend.model_wavlm_conformer_target.Model"
+
+[model.args]
+wavlm_src = "wavlm_base"
+wavlm_layer_num = 13
+wavlm_feat_dim = 768
+attention_in = 256
+ffn_hidden = 1024
+num_head = 4
+num_layer = 4
+dropout = 0.1
+chunk_size = 5
+use_posi = false
+output_activate_function = false
+selected_channel = 0
+num_channels = 1
+enrollment_dim = 256
+conditioning = "film"
+enrollment_hidden = 256
+
+[inference]
+[inference.args]
+seg_duration = 5
+segmentation_step = 0.1
+batch_size = 32
+apply_median_filtering = true
+median_filter_width = 11
+head_threshold = 0.5
+chunk_s = 5.0

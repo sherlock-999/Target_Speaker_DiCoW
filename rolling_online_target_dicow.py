@@ -13,17 +13,12 @@ import torchaudio
 from librosa import load as libr_load
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-TS_ASR_ROOT = Path('/home3/adnan/repos/TS-ASR-Whisper')
-EXTERNAL_DIARIZEN_ROOT = Path('/home3/adnan/repos/DiariZen')
 
 import sys
-sys.path.insert(0, str(EXTERNAL_DIARIZEN_ROOT))
-sys.path.insert(0, str(TS_ASR_ROOT))
-sys.path.insert(0, str(TS_ASR_ROOT / 'scripts'))
-sys.path.insert(0, str(TS_ASR_ROOT / 'src'))
-sys.path.append(str(PROJECT_ROOT / 'DiariZen'))
+sys.path.insert(0, str(PROJECT_ROOT / 'DiariZen'))
+sys.path.insert(0, str(PROJECT_ROOT))
 
-from streaming_dicow_demo import (  # noqa: E402
+from streaming_utils import (  # noqa: E402
     decode_window,
     load_dicow,
     normalize_words,

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from transformers import AutoFeatureExtractor, AutoModelForSpeechSeq2Seq, AutoTokenizer
 
 from rolling_online_target_dicow import RollingOnlineTargetDiCoW
+from online_target_dicow import OnlineTargetDiCoW
 from pipeline import DiCoWPipeline
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -19,8 +20,8 @@ from diarizen.pipelines.inference import DiariZenPipeline
 
 MODEL_NAME = "BUT-FIT/DiCoW_v3_2"
 DIARIZATION_MODEL = "BUT-FIT/diarizen-wavlm-large-s80-md"
-STNO_CONFIG = Path("/home3/adnan/repos/DiariZen/recipes/target_stno/exp_full/wavlm_target_stno_full/config__2026_04_10--02_44_05.toml")
-STNO_CHECKPOINT = Path("/home3/adnan/repos/DiariZen/recipes/target_stno/exp_full/wavlm_target_stno_full/checkpoints/epoch_0024/pytorch_model.bin")
+STNO_CONFIG = PROJECT_ROOT / "DiariZen" / "stno_model" / "config.toml"
+STNO_CHECKPOINT = PROJECT_ROOT / "DiariZen" / "stno_model" / "pytorch_model.bin"
 MODELS_DIR = Path(__file__).resolve().parent / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -76,6 +77,12 @@ def load_dicow_pipeline():
 
 
 pipeline = load_dicow_pipeline()
+online_chunked_pipeline = OnlineTargetDiCoW(
+    pipeline,
+    min_chunk_sec=3.0,
+    max_chunk_sec=8.0,
+    vad_threshold=0.5,
+)
 online_target_pipeline = RollingOnlineTargetDiCoW(
     pipeline,
     dicow_model_name=MODEL_NAME,
@@ -102,6 +109,17 @@ def transcribe(inputs, reference_audio=None):
         text = pipeline(inputs, return_timestamps=True)["text"]
     torch.cuda.empty_cache()
     return text
+
+
+def transcribe_chunked_target(audio, enrollment_audio):
+    if audio is None:
+        raise gr.Error("No mixed audio submitted. Please upload or record mixed-speaker audio.")
+    if enrollment_audio is None:
+        raise gr.Error("No enrollment audio submitted. Please upload or record reference speaker audio.")
+
+    result = online_chunked_pipeline.transcribe(audio, enrollment_audio)
+    torch.cuda.empty_cache()
+    return result["text"]
 
 
 def transcribe_online_target(audio, enrollment_audio):
@@ -214,6 +232,39 @@ def build_offline_demo():
     return demo
 
 
+def build_chunked_demo():
+    with gr.Blocks(theme=gr.themes.Ocean()) as demo:
+        gr.Markdown(
+            f"""
+            # DiCoW Chunked Online Target Speaker
+
+            Upload mixed-speaker audio and an enrollment clip. Audio is split into VAD-based speech chunks; each chunk is diarized independently, the target speaker is matched via embedding similarity, and DiCoW transcribes only that speaker. Chunk-level results with confidence scores are returned.
+
+            Unlike the streaming STNO route, this uses full offline diarization per chunk — no streaming model required.
+
+            Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
+            Diarization: [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL})
+            """
+        )
+        with gr.Row():
+            audio = gr.Audio(
+                sources=["microphone", "upload"],
+                type="filepath",
+                format="wav",
+                label="Mixed-speaker audio",
+            )
+            enrollment_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Enrollment speaker audio")
+        run = gr.Button("Transcribe target speaker", variant="primary")
+        transcript = gr.Textbox(label="Target-speaker transcript", lines=8)
+        run.click(
+            fn=transcribe_chunked_target,
+            inputs=[audio, enrollment_audio],
+            outputs=[transcript],
+        )
+        audio.start_recording(lambda: gr.Warning("Please wait for the mixed audio to be displayed before submitting!"))
+    return demo
+
+
 def build_online_target_demo():
     with gr.Blocks(theme=gr.themes.Ocean()) as demo:
         gr.Markdown(
@@ -248,6 +299,7 @@ def build_online_target_demo():
 def build_app():
     app = FastAPI()
     gr.mount_gradio_app(app, build_offline_demo().queue(max_size=5), path="/gradio-demo")
+    gr.mount_gradio_app(app, build_chunked_demo().queue(max_size=2), path="/chunked-demo")
     gr.mount_gradio_app(app, build_online_target_demo().queue(max_size=2), path="/target-demo")
     return app
 
@@ -276,6 +328,7 @@ if __name__ == "__main__":
             share=True,
         )
     else:
-        print(f"Offline DiCoW UI: http://{args.host}:{args.port}/gradio-demo")
-        print(f"Online target-speaker UI: http://{args.host}:{args.port}/target-demo")
+        print(f"Offline DiCoW UI:              http://{args.host}:{args.port}/gradio-demo")
+        print(f"Chunked online target-speaker UI: http://{args.host}:{args.port}/chunked-demo")
+        print(f"Streaming STNO target-speaker UI: http://{args.host}:{args.port}/target-demo")
         uvicorn.run(app, host=args.host, port=args.port)
