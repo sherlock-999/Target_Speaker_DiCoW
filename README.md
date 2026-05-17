@@ -166,13 +166,6 @@ python inference.py \
     --verbose
 ```
 
-### Local Processing (with local model checkpoints)
-
-```bash
-python local_run.py
-```
-This processes the first `.wav` file found in `./input/` and saves the transcription to `./output/`. Useful for testing with locally downloaded model weights.
-
 ## Pipeline Architecture
 
 ### Offline DiCoW (`DiCoWPipeline`)
