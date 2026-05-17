@@ -12,9 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "DiariZen"))
 MODELS_DIR = PROJECT_ROOT / "models"
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
-from transformers import AutoTokenizer, AutoFeatureExtractor
-
-from DiCoW.modeling_dicow import DiCoWForConditionalGeneration
+from transformers import AutoTokenizer, AutoFeatureExtractor, AutoModelForSpeechSeq2Seq
 
 from pipeline import DiCoWPipeline
 from diarizen.pipelines.inference import DiariZenPipeline
@@ -66,9 +64,10 @@ def main():
     # --------------------------------------------------
     # Load DiCoW model (LOCAL + MODIFIABLE)
     # --------------------------------------------------
-    dicow = DiCoWForConditionalGeneration.from_pretrained(
+    dicow = AutoModelForSpeechSeq2Seq.from_pretrained(
         DICOW_MODEL_PATH,
-        local_files_only=True
+        trust_remote_code=True,
+        local_files_only=True,
     ).to(device)
 
     feature_extractor = AutoFeatureExtractor.from_pretrained(

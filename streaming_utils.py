@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-import sys
 import types
 from dataclasses import dataclass
 from pathlib import Path
@@ -13,7 +12,6 @@ import numpy as np
 import torch
 
 
-REPO_ROOT = Path(__file__).resolve().parent
 FRAME_HZ = 50
 STNO_NAMES = ("S", "T", "N", "O")
 WORD_RE = re.compile(r"[^a-z0-9']+")
@@ -145,20 +143,18 @@ def real_streaming_stno(
 # ---------------------------------------------------------------------------
 
 def load_dicow(model_id: str, device: torch.device, local_files_only: bool):
-    sys.path.insert(0, REPO_ROOT.as_posix())
     from transformers.utils import logging as hf_logging
 
     hf_logging.set_verbosity_warning()
-    from model.DiCoW.modeling_dicow import DiCoWForConditionalGeneration
-    from transformers import GenerationConfig, WhisperFeatureExtractor, WhisperTokenizerFast
+    from transformers import AutoModelForSpeechSeq2Seq, GenerationConfig, WhisperFeatureExtractor, WhisperTokenizerFast
     from transformers.generation.utils import GenerationMixin
 
     hf_logging.set_verbosity_warning()
     try:
-        model = DiCoWForConditionalGeneration.from_pretrained(model_id, local_files_only=local_files_only)
+        model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, trust_remote_code=True, local_files_only=local_files_only)
     except Exception:
         if local_files_only:
-            model = DiCoWForConditionalGeneration.from_pretrained(model_id, local_files_only=False)
+            model = AutoModelForSpeechSeq2Seq.from_pretrained(model_id, trust_remote_code=True, local_files_only=False)
         else:
             raise
     feature_extractor = WhisperFeatureExtractor.from_pretrained("openai/whisper-large-v3-turbo", local_files_only=False)
