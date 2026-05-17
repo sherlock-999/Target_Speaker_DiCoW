@@ -1,25 +1,27 @@
 # DiCoW: Diarization-Conditioned Whisper for Target Speaker Automatic Speech Recognition
 
-DiCoW (Diarization-Conditioned Whisper) enhances OpenAI's Whisper ASR model by integrating **speaker diarization** for multi-speaker transcription. The project supports both offline (diarization-conditioned) and online (streaming target-speaker) ASR, powered by **BUT-FIT/DiariZen** speaker segmentation.
-
-Training and inference source code: [TS-ASR-Whisper](https://github.com/BUTSpeechFIT/TS-ASR-Whisper)
+DiCoW (Diarization-Conditioned Whisper) enhances OpenAI's Whisper ASR model by integrating **speaker diarization** for multi-speaker transcription. Supports offline, chunked-online, and streaming target-speaker ASR, powered by **BUT-FIT/DiariZen** speaker segmentation and **Adnan256/streaming-target-stno-wavlm-base** for streaming activity detection.
 
 
 ## Features
 
 - **Multi-Speaker ASR**: Handles multi-speaker audio using diarization-aware transcription.
-- **Target Speaker ASR (Online)**: Streaming target-speaker ASR with rolling-window decoding using STNO (Speaker-Timeline-Non-Overlapping) conditioning.
+- **Target Speaker ASR (Online & Streaming)**: Chunked VAD-based online transcription and streaming rolling-window decoding with STNO conditioning.
 - **Flexible Input Sources**:
   - **Microphone**: Record and transcribe live audio.
   - **Audio File Upload**: Upload pre-recorded audio files for transcription.
   - **Reference Speaker Enrollment**: Provide a reference audio sample to isolate a specific target speaker.
   - **Folder Batch Processing**: Process multiple `.wav` files from a directory via the command line.
-- **Dual-Mode Pipeline**:
-  - **Offline DiCoW**: Full-utterance diarization-conditioned transcription with optional target-speaker selection.
-  - **Online Target Speaker**: Rolling-window, low-latency transcription with streaming STNO conditioning.
+- **Three Inference Modes**:
+
+  | Mode | Route | Description |
+  |------|-------|-------------|
+  | **Offline DiCoW** | `/gradio-demo` | Full-utterance diarization + speaker-attributed ASR. Optional enrollment for target-speaker mode. |
+  | **Chunked Online** | `/chunked-demo` | VAD-based speech chunks → per-chunk diarization → target speaker matched by embedding similarity → DiCoW ASR. |
+  | **Streaming STNO** | `/target-demo` | Streaming STNO model tracks target speaker activity → rolling-window DiCoW decodes with committed transcript. |
 - **Diarization**: Powered by `BUT-FIT/diarizen-wavlm-large-s80-md` for accurate speaker segmentation.
 - **Built with 🤗 Transformers**: Uses Whisper checkpoints adapted for diarization conditioning via `BUT-FIT/DiCoW_v3_2`.
-- **FastAPI + Gradio Web Interface**: Modern web UI with two dedicated demo routes.
+- **FastAPI + Gradio Web Interface**: Modern web UI with three dedicated demo routes.
 
 ## Models
 
@@ -28,6 +30,7 @@ Training and inference source code: [TS-ASR-Whisper](https://github.com/BUTSpeec
 | [`BUT-FIT/DiCoW_v3_2`](https://huggingface.co/BUT-FIT/DiCoW_v3_2) | Latest DiCoW checkpoint for diarization-conditioned Whisper | CC BY 4.0 |
 | [`BUT-FIT/SE_DiCoW`](https://huggingface.co/BUT-FIT/SE_DiCoW) | Speaker-Embedding conditioned DiCoW variant | CC BY 4.0 |
 | [`BUT-FIT/diarizen-wavlm-large-s80-md`](https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md) | DiariZen speaker segmentation model | CC BY-NC 4.0 |
+| [`Adnan256/streaming-target-stno-wavlm-base`](https://huggingface.co/Adnan256/streaming-target-stno-wavlm-base) | Streaming STNO target-speaker activity detection | CC BY-NC 4.0 |
 
 ## Installation
 
@@ -126,9 +129,10 @@ Run the application locally:
 python app.py
 ```
 
-This starts a FastAPI server with two Gradio-mounted UIs:
+This starts a FastAPI server with three Gradio-mounted UIs:
 - **Offline DiCoW UI**: `http://localhost:7860/gradio-demo`
-- **Online Target Speaker UI**: `http://localhost:7860/target-demo`
+- **Chunked Online UI**: `http://localhost:7860/chunked-demo`
+- **Streaming STNO UI**: `http://localhost:7860/target-demo`
 
 For a shared Gradio link (no FastAPI routing):
 ```bash
@@ -169,19 +173,6 @@ python local_run.py
 ```
 This processes the first `.wav` file found in `./input/` and saves the transcription to `./output/`. Useful for testing with locally downloaded model weights.
 
-### Linux Service
-
-To run the demo as a background service, first edit `./run_server.sh` and `./DiCoW-background.service` to set the correct paths and user. Ensure the conda environment is properly configured in `run_server.sh`.
-
-Then register and start the service (as root):
-```bash
-systemctl enable ./DiCoW-background.service   # register the service
-systemctl start DiCoW-background.service       # start
-systemctl status DiCoW-background.service      # check status
-systemctl stop DiCoW-background.service        # stop
-systemctl disable DiCoW-background.service     # disable on reboot
-```
-
 ## Pipeline Architecture
 
 ### Offline DiCoW (`DiCoWPipeline`)
@@ -195,7 +186,16 @@ Extends HuggingFace's `AutomaticSpeechRecognitionPipeline` with diarization awar
 
 Supports **target speaker selection** via reference audio embedding similarity (cosine similarity).
 
-### Online Target Speaker (`RollingOnlineTargetDiCoW`)
+### Online Target Speaker Chunked (`OnlineTargetDiCoW`)
+
+VAD-based pseudo-streaming variant:
+
+1. **Silero VAD**: Splits audio into speech chunks (3–8s).
+2. **Per-Chunk Diarization**: Runs full diarization on each chunk.
+3. **Speaker Matching**: Computes embedding cosine similarity against enrollment.
+4. **Target-Speaker DiCoW**: Conditions DiCoW on the matched speaker.
+
+### Online Target Speaker Streaming (`RollingOnlineTargetDiCoW`)
 
 Streaming variant for low-latency target-speaker ASR:
 
@@ -208,8 +208,9 @@ Streaming variant for low-latency target-speaker ASR:
 
 1. **Offline DiCoW (Microphone)**: Record live audio for diarization-conditioned transcription.
 2. **Offline DiCoW (File Upload)**: Upload pre-recorded audio files for transcription.
-3. **Online Target Speaker**: Upload mixed-speaker audio + enrollment audio for streaming target-speaker transcription.
-4. **Folder Batch Processing**: Process multiple WAV files from command line.
+3. **Chunked Online Target**: VAD-chunked per-chunk diarization + target speaker matching.
+4. **Streaming STNO Target**: Streaming STNO activity tracking + rolling-window DiCoW decoding.
+5. **Folder Batch Processing**: Process multiple WAV files from command line.
 
 ## Contributing
 
@@ -255,9 +256,3 @@ If you use our model or code, please cite:
   doi={10.1109/ICASSP49660.2025.10887683}
 }
 ```
-
-## Contact
-
-For more information, feel free to contact:
-- [ipoloka@fit.vut.cz](mailto:ipoloka@fit.vut.cz)
-- [xkleme15@vutbr.cz](mailto:xkleme15@vutbr.cz)
