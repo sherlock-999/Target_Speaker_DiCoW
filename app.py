@@ -129,59 +129,53 @@ def transcribe_online_target(audio, enrollment_audio):
     return result["text"]
 
 
-def build_offline_demo():
-    demo = gr.Blocks(theme=gr.themes.Ocean())
+def render_offline_demo():
+    gr.Markdown(
+        f"""
+        # Offline DiCoW
 
-    mf_audio = gr.Audio(sources="microphone", type="filepath", format="wav")
-    mf_ref_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Reference speaker audio (optional)")
+        Full-utterance diarization-conditioned ASR for multi-speaker audio. Upload a file or record from the microphone. Add optional reference speaker audio when you want DiCoW to focus on one speaker.
 
-    mf_transcribe = gr.Interface(
-        fn=transcribe,
-        inputs=[mf_audio, mf_ref_audio],
-        outputs="text",
-        title="DiCoW: Diarization-Conditioned Whisper",
-        description=(
-            "DiCoW (Diarization-Conditioned Whisper) enhances Whisper with diarization-aware transcription, enabling it to handle multi-speaker audio effectively. "
-            "Use your microphone to transcribe audio with speaker-aware precision! "
-            f"\nThis demo uses the checkpoint [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME}), "
-            f"speaker diarization is powered by the  [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL}). **Note:** CTC joint decoding is disabled."
-        ),
-        flagging_mode="never",
+        Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
+        Diarization: [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL})  
+        Note: CTC joint decoding is disabled.
+        """
     )
-
-    file_transcribe = gr.Interface(
+    with gr.Row():
+        audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Audio file or microphone recording",
+        )
+        reference_audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Reference speaker audio (optional)",
+        )
+    run = gr.Button("Run Offline DiCoW ASR", variant="primary")
+    transcript = gr.Textbox(label="Full transcript", lines=8)
+    run.click(
         fn=transcribe,
-        inputs=[
-            gr.Audio(sources="upload", type="filepath", label="Audio file"),
-            gr.Audio(sources=["microphone", "upload"], type="filepath", label="Reference speaker audio (optional)"),
-        ],
-        outputs="text",
-        title="DiCoW: Diarization-Conditioned Whisper",
-        description=(
-            "DiCoW (Diarization-Conditioned Whisper) supports diarization-aware transcription for multi-speaker audio files. "
-            f"Upload an audio file to experience state-of-the-art multi-speaker transcription. Demo uses the checkpoint "
-            f"\nThis demo uses the checkpoint [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME}), "
-            f"speaker diarization is powered by the  [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL}). **Note:** CTC joint decoding is disabled."
-        ),
-        flagging_mode="never",
+        inputs=[audio, reference_audio],
+        outputs=[transcript],
     )
-
-    with demo:
-        gr.TabbedInterface([file_transcribe, mf_transcribe], ["Audio file", "Microphone"])
-
+    audio.start_recording(lambda: gr.Warning("Please wait for the audio to be displayed before submitting!"))
+    reference_audio.start_recording(
+        lambda: gr.Warning("Please wait for the reference audio to be displayed before submitting!")
+    )
+    with gr.Accordion("Features, citation, and license", open=False):
         gr.Markdown(
             """
-            ## Features
+            ### Features
 
-            - **Multi-Speaker ASR**: Handles multi-speaker audio using diarization-aware transcription.  
-            - **Flexible Input Sources**:  
-              - **Microphone**: Record and transcribe live audio.  
-              - **Audio File Upload**: Upload pre-recorded audio files for transcription.  
-            - **Diarization Support**: Powered by `BUT-FIT/diarizen-wavlm-large-s80-md` for accurate speaker segmentation.  
-            - **Built with 🤗 Transformers**: Uses the latest Whisper checkpoints for robust transcription.  
+            - **Multi-Speaker ASR**: Handles multi-speaker audio using diarization-aware transcription.
+            - **Flexible Input Sources**: Record from a microphone or upload pre-recorded audio.
+            - **Diarization Support**: Powered by `BUT-FIT/diarizen-wavlm-large-s80-md`.
 
-            ## Citation
-            If you use our model or code, please, cite:
+            ### Citation
+            If you use our model or code, please cite:
             ```bibtex
             @article{POLOK2026101841,
                 title = {DiCoW: Diarization-conditioned Whisper for target speaker automatic speech recognition},
@@ -189,106 +183,117 @@ def build_offline_demo():
                 volume = {95},
                 pages = {101841},
                 year = {2026},
-                issn = {0885-2308},
                 doi = {https://doi.org/10.1016/j.csl.2025.101841},
-                url = {https://www.sciencedirect.com/science/article/pii/S088523082500066X},
-                author = {Alexander Polok and Dominik Klement and Martin Kocour and Jiangyu Han and Federico Landini and Bolaji Yusuf and Matthew Wiesner and Sanjeev Khudanpur and Jan Černocký and Lukáš Burget},
-                keywords = {Diarization-conditioned Whisper, Target-speaker ASR, Speaker diarization, Long-form ASR, Whisper adaptation},
+                author = {Alexander Polok and Dominik Klement and Martin Kocour and Jiangyu Han and Federico Landini and Bolaji Yusuf and Matthew Wiesner and Sanjeev Khudanpur and Jan Cernocky and Lukas Burget},
             }
-            
+
             @INPROCEEDINGS{10887683,
-              author={Polok, Alexander and Klement, Dominik and Wiesner, Matthew and Khudanpur, Sanjeev and Černocký, Jan and Burget, Lukáš},
-              booktitle={ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, 
-              title={Target Speaker ASR with Whisper}, 
+              author={Polok, Alexander and Klement, Dominik and Wiesner, Matthew and Khudanpur, Sanjeev and Cernocky, Jan and Burget, Lukas},
+              booktitle={ICASSP 2025 - 2025 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)},
+              title={Target Speaker ASR with Whisper},
               year={2025},
-              volume={},
-              number={},
               pages={1-5},
-              keywords={Transforms;Signal processing;Transformers;Acoustics;Speech processing;target-speaker ASR;diarization conditioning;multi-speaker ASR;Whisper},
               doi={10.1109/ICASSP49660.2025.10887683}
             }
-            
             ```
-            ## License
-            
-            This project combines multiple components, each with its own license:
-            
-            * **DiCoW** (this repository): Licensed under the [Apache License 2.0](LICENSE).
-            * **DiCoW Model Weights**: Released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) – attribution required for usage.
-            * **Diarizen (BUT-FIT/diarizen-wavlm-large-s80-mlc)**: Licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) – free for research and non-commercial use only.
 
-            Please ensure compliance with the respective licenses when using, modifying, or redistributing these components.
-            
-            ## Contributing
-            We welcome contributions! If you’d like to add features or improve our pipeline, please open an issue or submit a pull request.
+            ### License
+            DiCoW code is Apache 2.0, DiCoW model weights are CC BY 4.0, and Diarizen is CC BY-NC 4.0.
             """
         )
-        mf_audio.start_recording(lambda: gr.Warning("Please wait for the audio to be displayed before submitting!"))
 
+
+def build_offline_demo():
+    with gr.Blocks(theme=gr.themes.Ocean()) as demo:
+        render_offline_demo()
     return demo
+
+
+def render_chunked_demo():
+    gr.Markdown(
+        f"""
+        # Chunked Online Target Speaker
+
+        Upload mixed-speaker audio or record from the microphone, then provide an enrollment clip for the target speaker. The audio is handled as simulated streaming: it is split into VAD-based speech chunks, each chunk is diarized independently, the target speaker is matched by embedding similarity, and DiCoW transcribes that speaker chunk by chunk.
+
+        Unlike the STNO route, this uses offline diarization inside each speech chunk and does not require the streaming STNO model.
+
+        Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
+        Diarization: [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL})
+        """
+    )
+    with gr.Row():
+        audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Mixed-speaker audio or microphone recording",
+        )
+        enrollment_audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Enrollment speaker audio",
+        )
+    run = gr.Button("Run Chunked Online ASR", variant="primary")
+    transcript = gr.Textbox(label="Chunked target-speaker transcript", lines=8)
+    run.click(
+        fn=transcribe_chunked_target,
+        inputs=[audio, enrollment_audio],
+        outputs=[transcript],
+    )
+    audio.start_recording(lambda: gr.Warning("Please wait for the mixed audio to be displayed before submitting!"))
+    enrollment_audio.start_recording(
+        lambda: gr.Warning("Please wait for the enrollment audio to be displayed before submitting!")
+    )
 
 
 def build_chunked_demo():
     with gr.Blocks(theme=gr.themes.Ocean()) as demo:
-        gr.Markdown(
-            f"""
-            # DiCoW Chunked Online Target Speaker
-
-            Upload mixed-speaker audio and an enrollment clip. Audio is split into VAD-based speech chunks; each chunk is diarized independently, the target speaker is matched via embedding similarity, and DiCoW transcribes only that speaker. Chunk-level results with confidence scores are returned.
-
-            Unlike the streaming STNO route, this uses full offline diarization per chunk — no streaming model required.
-
-            Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
-            Diarization: [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL})
-            """
-        )
-        with gr.Row():
-            audio = gr.Audio(
-                sources=["microphone", "upload"],
-                type="filepath",
-                format="wav",
-                label="Mixed-speaker audio",
-            )
-            enrollment_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Enrollment speaker audio")
-        run = gr.Button("Transcribe target speaker", variant="primary")
-        transcript = gr.Textbox(label="Target-speaker transcript", lines=8)
-        run.click(
-            fn=transcribe_chunked_target,
-            inputs=[audio, enrollment_audio],
-            outputs=[transcript],
-        )
-        audio.start_recording(lambda: gr.Warning("Please wait for the mixed audio to be displayed before submitting!"))
+        render_chunked_demo()
     return demo
+
+
+def render_online_target_demo():
+    gr.Markdown(
+        f"""
+        # Streaming STNO Target Speaker
+
+        Upload mixed-speaker audio or record from the microphone, then provide enrollment audio for the target speaker. Uploaded files are processed as simulated streams: the STNO model tracks target-speaker activity over rolling context, DiCoW decodes rolling windows, and only committed target-speaker text is returned.
+
+        Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
+        STNO model: [Adnan256/streaming-target-stno-wavlm-base](https://huggingface.co/Adnan256/streaming-target-stno-wavlm-base)
+        """
+    )
+    with gr.Row():
+        audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Mixed-speaker audio or microphone recording",
+        )
+        enrollment_audio = gr.Audio(
+            sources=["microphone", "upload"],
+            type="filepath",
+            format="wav",
+            label="Enrollment speaker audio",
+        )
+    run = gr.Button("Run Streaming STNO ASR", variant="primary")
+    transcript = gr.Textbox(label="Committed streaming target-speaker transcript", lines=8)
+    run.click(
+        fn=transcribe_online_target,
+        inputs=[audio, enrollment_audio],
+        outputs=[transcript],
+    )
+    audio.start_recording(lambda: gr.Warning("Please wait for the mixed audio to be displayed before submitting!"))
+    enrollment_audio.start_recording(
+        lambda: gr.Warning("Please wait for the enrollment audio to be displayed before submitting!")
+    )
 
 
 def build_online_target_demo():
     with gr.Blocks(theme=gr.themes.Ocean()) as demo:
-        gr.Markdown(
-            f"""
-            # DiCoW Online Target Speaker
-
-            Record or upload mixed-speaker audio and provide enrollment audio for the target speaker. This route uses streaming STNO conditioning with rolling online DiCoW decoding and returns committed target-speaker transcript chunks.
-
-            Checkpoint: [{MODEL_NAME}](https://huggingface.co/{MODEL_NAME})  
-            Diarization: [{DIARIZATION_MODEL}](https://huggingface.co/{DIARIZATION_MODEL})
-            """
-        )
-        with gr.Row():
-            audio = gr.Audio(
-                sources=["microphone", "upload"],
-                type="filepath",
-                format="wav",
-                label="Mixed-speaker audio",
-            )
-            enrollment_audio = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Enrollment speaker audio")
-        run = gr.Button("Transcribe target speaker", variant="primary")
-        transcript = gr.Textbox(label="Target-speaker transcript", lines=8)
-        run.click(
-            fn=transcribe_online_target,
-            inputs=[audio, enrollment_audio],
-            outputs=[transcript],
-        )
-        audio.start_recording(lambda: gr.Warning("Please wait for the mixed audio to be displayed before submitting!"))
+        render_online_target_demo()
     return demo
 
 
@@ -301,10 +306,28 @@ def build_app():
 
 
 def build_share_demo():
-    return gr.TabbedInterface(
-        [build_offline_demo(), build_online_target_demo()],
-        ["Offline DiCoW", "Online Target Speaker"],
-    )
+    with gr.Blocks(theme=gr.themes.Ocean()) as demo:
+        gr.Markdown(
+            """
+            # Target Speaker DiCoW Demos
+
+            Choose one of the three ASR modes below. Every audio input supports either upload or microphone recording.
+
+            | Method | What it does |
+            | --- | --- |
+            | **Offline DiCoW** | Runs full-utterance diarization-conditioned ASR. Optional reference audio focuses the output on one speaker. |
+            | **Chunked Online** | Simulates streaming by splitting audio into VAD speech chunks, diarizing each chunk, matching the target by enrollment voice, and decoding chunk by chunk. |
+            | **Streaming STNO** | Simulates streaming with target-speaker activity tracking, rolling DiCoW windows, and committed transcript updates. |
+            """
+        )
+        with gr.Tabs():
+            with gr.Tab("Offline DiCoW"):
+                render_offline_demo()
+            with gr.Tab("Chunked Online"):
+                render_chunked_demo()
+            with gr.Tab("Streaming STNO"):
+                render_online_target_demo()
+    return demo
 
 
 app = build_app()
